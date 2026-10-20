@@ -1,0 +1,30 @@
+{
+  "name": "dna-visualization-deepseek",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Интерактивная 3D-визуализация двойной спирали ДНК человека на Three.js",
+  "homepage": "https://sirgopadawan.github.io/dna-visualization-deepseek/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirGoPadawan/dna-visualization-deepseek.git"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "start": "node scripts/serve.mjs",
+    "check": "node --check src/main.js && node --check src/helix.js && node --check src/scene.js && node --check src/sequence.js && node --check scripts/serve.mjs"
+  },
+  "keywords": [
+    "dna",
+    "threejs",
+    "webgl",
+    "visualization",
+    "biology",
+    "github-pages"
+  ],
+  "author": "SirGoPadawan",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
