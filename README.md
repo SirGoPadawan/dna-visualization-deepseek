@@ -46,13 +46,15 @@ npm run check
 
 ## Деплой на GitHub Pages
 
-Репозиторий уже содержит workflow `.github/workflows/deploy.yml`:
+Репозиторий уже содержит workflow `.github/workflows/deploy.yml`.
 
-1. Запушьте ветку `main`.
-2. Workflow сам включит GitHub Pages (Source → **GitHub Actions**) при первом запуске.
-3. После сборки сайт будет доступен по адресу `https://<username>.github.io/<repo>/`.
+Один раз включите Pages вручную: **Settings → Pages → Source → GitHub Actions**.
+После этого каждый пуш в `main` будет собирать и публиковать сайт.
 
-Если хотите включить вручную: **Settings → Pages → Source → GitHub Actions**.
+Если первый запуск workflow упал до включения Pages — откройте
+**Actions → Deploy to GitHub Pages → Re-run all jobs**.
+
+Сайт будет доступен по адресу `https://<username>.github.io/<repo>/`.
 
 Все пути в проекте относительные, поэтому сайт корректно работает из подпапки
 (`/dna-visualization-deepseek/`). Файл `.nojekyll` отключает обработку Jekyll.
