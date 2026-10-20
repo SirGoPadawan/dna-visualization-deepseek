@@ -41,6 +41,41 @@ export const BDNA = Object.freeze({
 const UP = new THREE.Vector3(0, 1, 0);
 const WHITE = new THREE.Color(0xffffff);
 
+/**
+ * Склеивает индексированные геометрии с одинаковым набором атрибутов
+ * (позиции/нормали/uv) в одну — чтобы рисовать обе нити одним draw call.
+ */
+function mergeGeometries(geometries) {
+  const merged = new THREE.BufferGeometry();
+  const attributes = Object.keys(geometries[0].attributes);
+
+  for (const name of attributes) {
+    const itemSize = geometries[0].attributes[name].itemSize;
+    const length = geometries.reduce((sum, g) => sum + g.attributes[name].array.length, 0);
+    const array = new Float32Array(length);
+    let offset = 0;
+    for (const g of geometries) {
+      array.set(g.attributes[name].array, offset);
+      offset += g.attributes[name].array.length;
+    }
+    merged.setAttribute(name, new THREE.BufferAttribute(array, itemSize));
+  }
+
+  const indexLength = geometries.reduce((sum, g) => sum + g.index.count, 0);
+  const index = new Uint32Array(indexLength);
+  let indexOffset = 0;
+  let vertexOffset = 0;
+  for (const g of geometries) {
+    const source = g.index.array;
+    for (let i = 0; i < source.length; i += 1) index[indexOffset + i] = source[i] + vertexOffset;
+    indexOffset += source.length;
+    vertexOffset += g.attributes.position.count;
+  }
+  merged.setIndex(new THREE.BufferAttribute(index, 1));
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 export function createDNA({ sequence, quality = "high" }) {
   const high = quality === "high";
   const group = new THREE.Group();
@@ -149,6 +184,9 @@ export function createDNA({ sequence, quality = "high" }) {
     mesh.frustumCulled = false;
     mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
   }
+  // Ловушки нужны только для raycast (он не проверяет visible), поэтому
+  // из отрисовки их исключаем — минус один draw call и лишний проход.
+  pickers.visible = false;
   halos.renderOrder = 2;
 
   /* ---------------------------------------------------------------------- */
@@ -333,28 +371,37 @@ export function createDNA({ sequence, quality = "high" }) {
   const tubularSegments = Math.max(48, Math.round(count * (high ? 6 : 4)));
 
   const tubeRadius = BDNA.backboneRadius;
-  const tubeGeometryA = new THREE.TubeGeometry(curveA, tubularSegments, tubeRadius, high ? 10 : 7, false);
-  const tubeGeometryB = new THREE.TubeGeometry(curveB, tubularSegments, tubeRadius, high ? 10 : 7, false);
+  const strandGeometryA = new THREE.TubeGeometry(curveA, tubularSegments, tubeRadius, high ? 10 : 7, false);
+  const strandGeometryB = new THREE.TubeGeometry(curveB, tubularSegments, tubeRadius, high ? 10 : 7, false);
 
-  const tubeA = new THREE.Mesh(tubeGeometryA, backboneMaterial);
-  const tubeB = new THREE.Mesh(tubeGeometryB, backboneMaterial);
-  tubeA.frustumCulled = false;
-  tubeB.frustumCulled = false;
+  // Обе нити используют один материал — склеиваем их в одну геометрию.
+  const tubeGeometry = mergeGeometries([strandGeometryA, strandGeometryB]);
+  strandGeometryA.dispose();
+  strandGeometryB.dispose();
+
+  const tubes = new THREE.Mesh(tubeGeometry, backboneMaterial);
+  tubes.frustumCulled = false;
 
   const glowUniforms = {
     uTime: { value: 0 },
     uColorA: { value: new THREE.Color("#54d8ff") },
     uColorB: { value: new THREE.Color("#ff7aa2") },
-    uOpacity: { value: 0.34 },
+    uOpacity: { value: 0.42 },
   };
 
   const pulseMaterial = new THREE.ShaderMaterial({
     uniforms: glowUniforms,
     vertexShader: /* glsl */ `
       varying vec2 vUv;
+      varying vec3 vNormalV;
+      varying vec3 vViewDir;
+
       void main() {
         vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormalV = normalize(normalMatrix * normal);
+        vViewDir = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
       }
     `,
     fragmentShader: /* glsl */ `
@@ -363,13 +410,22 @@ export function createDNA({ sequence, quality = "high" }) {
       uniform vec3 uColorB;
       uniform float uOpacity;
       varying vec2 vUv;
+      varying vec3 vNormalV;
+      varying vec3 vViewDir;
 
       void main() {
+        // Бегущий по цепи импульс.
         float travel = vUv.y * 46.0 - uTime * 2.4;
         float wave = pow(max(0.0, sin(travel)), 14.0);
         float secondary = pow(max(0.0, sin(travel * 0.37 + 1.7)), 22.0);
+
+        // Френель: кромки трубки светятся ярче — неоновый контур.
+        float rim = pow(1.0 - abs(dot(normalize(vNormalV), normalize(vViewDir))), 2.0);
+
         vec3 color = mix(uColorA, uColorB, smoothstep(0.0, 1.0, vUv.y));
-        float alpha = (0.028 + wave * 0.5 + secondary * 0.35) * uOpacity;
+        color += vec3(0.25, 0.65, 1.0) * wave * 0.9; // HDR-ядро импульса
+
+        float alpha = (0.028 + rim * 0.22 + wave * 0.72 + secondary * 0.4) * uOpacity;
         gl_FragColor = vec4(color, alpha);
       }
     `,
@@ -380,20 +436,17 @@ export function createDNA({ sequence, quality = "high" }) {
     toneMapped: false,
   });
 
-  const glowA = new THREE.Mesh(
-    new THREE.TubeGeometry(curveA, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false),
-    pulseMaterial,
-  );
-  const glowB = new THREE.Mesh(
-    new THREE.TubeGeometry(curveB, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false),
-    pulseMaterial,
-  );
-  glowA.renderOrder = 3;
-  glowB.renderOrder = 3;
-  glowA.frustumCulled = false;
-  glowB.frustumCulled = false;
+  const glowGeometryA = new THREE.TubeGeometry(curveA, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false);
+  const glowGeometryB = new THREE.TubeGeometry(curveB, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false);
+  const glowGeometry = mergeGeometries([glowGeometryA, glowGeometryB]);
+  glowGeometryA.dispose();
+  glowGeometryB.dispose();
 
-  group.add(tubeA, tubeB, glowA, glowB, connectors, sugars, phosphates, pickers, bases, halos, hbonds);
+  const glow = new THREE.Mesh(glowGeometry, pulseMaterial);
+  glow.renderOrder = 3;
+  glow.frustumCulled = false;
+
+  group.add(tubes, glow, connectors, sugars, phosphates, pickers, bases, halos, hbonds);
 
   /* ---------------------------------------------------------------------- */
   /* API                                                                     */

@@ -206,9 +206,9 @@ function createComposer() {
 
   bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    state.isMobile ? 0.4 : 0.34,
+    state.isMobile ? 0.42 : 0.4,
     0.6,
-    0.86,
+    0.85,
   );
   instance.addPass(bloomPass);
   instance.addPass(new OutputPass());
