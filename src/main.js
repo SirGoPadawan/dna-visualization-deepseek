@@ -8,11 +8,13 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { createSequence, BASES } from "./sequence.js";
 import { createDNA, BDNA } from "./helix.js";
 import { createEnvironment, createBackdrop, createParticles, createLights } from "./scene.js";
+import { getTheme } from "./theme.js";
 
 /* -------------------------------------------------------------------------- */
 /* Настройки                                                                  */
 /* -------------------------------------------------------------------------- */
 
+const THEME = getTheme();
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const coarseQuery = window.matchMedia("(pointer: coarse)");
 
@@ -134,21 +136,25 @@ function init() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x050810);
-  scene.fog = new THREE.FogExp2(0x050810, 0.0055);
-  scene.environment = createEnvironment(renderer);
+  scene.background = new THREE.Color(THEME.sceneBg);
+  scene.fog = new THREE.FogExp2(THEME.sceneBg, 0.0055);
+  scene.environment = createEnvironment(renderer, THEME.env);
   scene.environmentIntensity = 0.7;
-  scene.add(createBackdrop());
-  scene.add(createLights());
+  scene.add(createBackdrop(THEME.backdrop));
+  scene.add(createLights(THEME.lights));
 
   camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 400);
 
   const sequence = createSequence(BP_COUNT);
   state.sequence = sequence.strand1;
-  dna = createDNA({ sequence, quality: QUALITY });
+  dna = createDNA({ sequence, quality: QUALITY, palette: THEME });
   scene.add(dna.group);
 
-  dust = createParticles({ count: QUALITY === "high" ? 950 : 420 });
+  dust = createParticles({
+    count: QUALITY === "high" ? 950 : 420,
+    tintA: THEME.dust.a,
+    tintB: THEME.dust.b,
+  });
   scene.add(dust);
 
   raycaster = new THREE.Raycaster();
@@ -206,9 +212,9 @@ function createComposer() {
 
   bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    state.isMobile ? 0.42 : 0.4,
-    0.6,
-    0.85,
+    state.isMobile ? THEME.bloom.mobile : THEME.bloom.strength,
+    THEME.bloom.radius,
+    THEME.bloom.threshold,
   );
   instance.addPass(bloomPass);
   instance.addPass(new OutputPass());
@@ -401,7 +407,7 @@ function renderSequence() {
       const wrapped = ((index % sequence.length) + sequence.length) % sequence.length;
       const base = sequence[wrapped];
       const isFocus = index === focus;
-      line += `<span class="seq__base${isFocus ? " seq__base--focus" : ""}" style="--c:${BASES[base].color}">${base}</span>`;
+      line += `<span class="seq__base${isFocus ? " seq__base--focus" : ""}" style="--c:${THEME.baseColors?.[base] ?? BASES[base].color}">${base}</span>`;
     }
     markup += `<div class="seq__row">${line}</div>`;
   }
@@ -569,7 +575,7 @@ function showTooltip(info) {
 
   dom.tipIndex.textContent = `пара ${String(info.bp + 1).padStart(3, "0")} / ${dna.count}`;
   dom.tipPair.textContent = pair;
-  dom.tipMeta.textContent = `${info.hbonds} водородные связи · ${pairName}`;
+  dom.tipMeta.textContent = `${info.hbonds} ${THEME.bondLabel} · ${pairName}`;
 
   const x = THREE.MathUtils.clamp(state.pointerClient.x, 130, window.innerWidth - 130);
   const y = Math.max(state.pointerClient.y, 120);

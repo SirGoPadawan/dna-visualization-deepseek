@@ -5,17 +5,20 @@
 import * as THREE from "three";
 
 /** Мягкая градиентная карта для отражений на «металлическом» остове. */
-export function createEnvironment(renderer) {
+export function createEnvironment(renderer, preset = null) {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
 
   const base = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  base.addColorStop(0, "#0b1b31");
-  base.addColorStop(0.42, "#122a4a");
-  base.addColorStop(0.62, "#0a1526");
-  base.addColorStop(1, "#03060d");
+  const stops = preset?.stops ?? [
+    [0, "#0b1b31"],
+    [0.42, "#122a4a"],
+    [0.62, "#0a1526"],
+    [1, "#03060d"],
+  ];
+  for (const [offset, color] of stops) base.addColorStop(offset, color);
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -30,11 +33,14 @@ export function createEnvironment(renderer) {
   };
 
   // «Софтбоксы» — дают длинные блики на спирали.
-  blob(300, 60, 250, "#ffffff", 0.95);
-  blob(760, 130, 300, "#7fe3ff", 0.7);
-  blob(120, 300, 260, "#ff8fb1", 0.45);
-  blob(880, 350, 260, "#3f7dff", 0.4);
-  blob(520, 470, 320, "#0b1a2c", 0.85);
+  const blobs = preset?.blobs ?? [
+    [300, 60, 250, "#ffffff", 0.95],
+    [760, 130, 300, "#7fe3ff", 0.7],
+    [120, 300, 260, "#ff8fb1", 0.45],
+    [880, 350, 260, "#3f7dff", 0.4],
+    [520, 470, 320, "#0b1a2c", 0.85],
+  ];
+  for (const [x, y, radius, color, alpha] of blobs) blob(x, y, radius, color, alpha);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -50,15 +56,15 @@ export function createEnvironment(renderer) {
 }
 
 /** Тёмная сфера с градиентом и мягким свечением за молекулой. */
-export function createBackdrop() {
+export function createBackdrop(palette = null) {
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      uTop: { value: new THREE.Color("#071425") },
-      uBottom: { value: new THREE.Color("#02040a") },
-      uGlow: { value: new THREE.Color("#1d5c86") },
-      uAura: { value: new THREE.Color("#2f86b8") },
+      uTop: { value: new THREE.Color(palette?.top ?? "#071425") },
+      uBottom: { value: new THREE.Color(palette?.bottom ?? "#02040a") },
+      uGlow: { value: new THREE.Color(palette?.glow ?? "#1d5c86") },
+      uAura: { value: new THREE.Color(palette?.aura ?? "#2f86b8") },
     },
     vertexShader: /* glsl */ `
       varying vec3 vWorld;
@@ -106,7 +112,7 @@ export function createBackdrop() {
 }
 
 /** Пыль, медленно дрейфующая вокруг молекулы. */
-export function createParticles({ count = 900 } = {}) {
+export function createParticles({ count = 900, tintA, tintB } = {}) {
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
   const phases = new Float32Array(count);
@@ -130,6 +136,8 @@ export function createParticles({ count = 900 } = {}) {
     uniforms: {
       uTime: { value: 0 },
       uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+      uTintA: { value: new THREE.Vector3(...(tintA ?? [0.42, 0.66, 1.0])) },
+      uTintB: { value: new THREE.Vector3(...(tintB ?? [0.85, 0.95, 1.0])) },
     },
     vertexShader: /* glsl */ `
       attribute float aSize;
@@ -147,13 +155,15 @@ export function createParticles({ count = 900 } = {}) {
       }
     `,
     fragmentShader: /* glsl */ `
+      uniform vec3 uTintA;
+      uniform vec3 uTintB;
       varying float vAlpha;
       void main() {
         vec2 uv = gl_PointCoord - 0.5;
         float dist = length(uv);
         float alpha = smoothstep(0.5, 0.0, dist);
         alpha = pow(alpha, 2.4);
-        vec3 color = mix(vec3(0.42, 0.66, 1.0), vec3(0.85, 0.95, 1.0), vAlpha);
+        vec3 color = mix(uTintA, uTintB, vAlpha);
         gl_FragColor = vec4(color, alpha * vAlpha * 0.55);
       }
     `,
@@ -169,25 +179,29 @@ export function createParticles({ count = 900 } = {}) {
 }
 
 /** Свет: ключевой, контровой и две цветные подсветки. */
-export function createLights() {
+export function createLights(palette = null) {
   const group = new THREE.Group();
   group.name = "lights";
 
-  const hemisphere = new THREE.HemisphereLight(0x9ec8ff, 0x1a0e26, 0.32);
+  const hemisphere = new THREE.HemisphereLight(
+    palette?.hemiSky ?? 0x9ec8ff,
+    palette?.hemiGround ?? 0x1a0e26,
+    0.32,
+  );
 
-  const key = new THREE.DirectionalLight(0xeaf2ff, 1.9);
+  const key = new THREE.DirectionalLight(palette?.key ?? 0xeaf2ff, 1.9);
   key.position.set(8, 14, 10);
 
-  const fill = new THREE.DirectionalLight(0x5b8cff, 0.8);
+  const fill = new THREE.DirectionalLight(palette?.fill ?? 0x5b8cff, 0.8);
   fill.position.set(-10, -3, -9);
 
-  const rimCyan = new THREE.PointLight(0x37d7ff, 85, 140, 1.9);
+  const rimCyan = new THREE.PointLight(palette?.rimA ?? 0x37d7ff, 85, 140, 1.9);
   rimCyan.position.set(-13, 7, -9);
 
-  const rimRose = new THREE.PointLight(0xff5f8f, 70, 140, 1.9);
+  const rimRose = new THREE.PointLight(palette?.rimB ?? 0xff5f8f, 70, 140, 1.9);
   rimRose.position.set(13, -7, 8);
 
-  const rimWarm = new THREE.PointLight(0xffc266, 46, 120, 1.9);
+  const rimWarm = new THREE.PointLight(palette?.rimC ?? 0xffc266, 46, 120, 1.9);
   rimWarm.position.set(2, 15, -12);
 
   group.add(hemisphere, key, fill, rimCyan, rimRose, rimWarm);

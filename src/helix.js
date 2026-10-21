@@ -44,8 +44,9 @@ const WHITE = new THREE.Color(0xffffff);
 /**
  * Склеивает индексированные геометрии с одинаковым набором атрибутов
  * (позиции/нормали/uv) в одну — чтобы рисовать обе нити одним draw call.
+ * Если передан strandAttribute, добавляет атрибут с номером исходной нити.
  */
-function mergeGeometries(geometries) {
+function mergeGeometries(geometries, { strandAttribute = null } = {}) {
   const merged = new THREE.BufferGeometry();
   const attributes = Object.keys(geometries[0].attributes);
 
@@ -72,11 +73,23 @@ function mergeGeometries(geometries) {
     vertexOffset += g.attributes.position.count;
   }
   merged.setIndex(new THREE.BufferAttribute(index, 1));
+
+  if (strandAttribute) {
+    const total = geometries.reduce((sum, g) => sum + g.attributes.position.count, 0);
+    const strands = new Float32Array(total);
+    let start = 0;
+    geometries.forEach((g, i) => {
+      strands.fill(i, start, start + g.attributes.position.count);
+      start += g.attributes.position.count;
+    });
+    merged.setAttribute(strandAttribute, new THREE.BufferAttribute(strands, 1));
+  }
+
   merged.computeBoundingSphere();
   return merged;
 }
 
-export function createDNA({ sequence, quality = "high" }) {
+export function createDNA({ sequence, quality = "high", palette = null }) {
   const high = quality === "high";
   const group = new THREE.Group();
   group.name = "dna";
@@ -114,7 +127,7 @@ export function createDNA({ sequence, quality = "high" }) {
   const glowMaterial = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.1,
+    opacity: palette?.haloOpacity ?? 0.1,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
@@ -153,9 +166,9 @@ export function createDNA({ sequence, quality = "high" }) {
   });
 
   const hbondMaterial = new THREE.MeshBasicMaterial({
-    color: 0x9fe8ff,
+    color: palette?.bond?.color ?? 0x9fe8ff,
     transparent: true,
-    opacity: 0.42,
+    opacity: palette?.bond?.opacity ?? 0.42,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -292,8 +305,8 @@ export function createDNA({ sequence, quality = "high" }) {
     innerA.copy(junction).addScaledVector(u, BDNA.gapHalf);
     innerB.copy(junction).addScaledVector(u, -BDNA.gapHalf);
 
-    const colorA = new THREE.Color(infoA.color);
-    const colorB = new THREE.Color(infoB.color);
+    const colorA = new THREE.Color(palette?.baseColors?.[baseA] ?? infoA.color);
+    const colorB = new THREE.Color(palette?.baseColors?.[baseB] ?? infoB.color);
 
     const hydrogenBonds = baseA === "A" || baseA === "T" ? 2 : 3;
 
@@ -384,20 +397,26 @@ export function createDNA({ sequence, quality = "high" }) {
 
   const glowUniforms = {
     uTime: { value: 0 },
-    uColorA: { value: new THREE.Color("#54d8ff") },
-    uColorB: { value: new THREE.Color("#ff7aa2") },
-    uOpacity: { value: 0.42 },
+    uColorA: { value: new THREE.Color(palette?.glow?.bottom ?? "#54d8ff") },
+    uColorB: { value: new THREE.Color(palette?.glow?.top ?? "#ff7aa2") },
+    uStrandA: { value: new THREE.Color(palette?.glow?.strandA ?? "#54d8ff") },
+    uStrandB: { value: new THREE.Color(palette?.glow?.strandB ?? "#ff7aa2") },
+    uStrandMix: { value: palette?.glow?.strandMix ?? 0 },
+    uOpacity: { value: palette?.glow?.opacity ?? 0.42 },
   };
 
   const pulseMaterial = new THREE.ShaderMaterial({
     uniforms: glowUniforms,
     vertexShader: /* glsl */ `
+      attribute float aStrand;
       varying vec2 vUv;
       varying vec3 vNormalV;
       varying vec3 vViewDir;
+      varying float vStrand;
 
       void main() {
         vUv = uv;
+        vStrand = aStrand;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vNormalV = normalize(normalMatrix * normal);
         vViewDir = normalize(-mv.xyz);
@@ -408,10 +427,14 @@ export function createDNA({ sequence, quality = "high" }) {
       uniform float uTime;
       uniform vec3 uColorA;
       uniform vec3 uColorB;
+      uniform vec3 uStrandA;
+      uniform vec3 uStrandB;
+      uniform float uStrandMix;
       uniform float uOpacity;
       varying vec2 vUv;
       varying vec3 vNormalV;
       varying vec3 vViewDir;
+      varying float vStrand;
 
       void main() {
         // Бегущий по цепи импульс.
@@ -422,7 +445,10 @@ export function createDNA({ sequence, quality = "high" }) {
         // Френель: кромки трубки светятся ярче — неоновый контур.
         float rim = pow(1.0 - abs(dot(normalize(vNormalV), normalize(vViewDir))), 2.0);
 
-        vec3 color = mix(uColorA, uColorB, smoothstep(0.0, 1.0, vUv.y));
+        // Вертикальный градиент либо собственный цвет каждой цепи.
+        vec3 gradient = mix(uColorA, uColorB, smoothstep(0.0, 1.0, vUv.y));
+        vec3 strand = mix(uStrandA, uStrandB, clamp(vStrand, 0.0, 1.0));
+        vec3 color = mix(gradient, strand, uStrandMix);
         color += vec3(0.25, 0.65, 1.0) * wave * 0.9; // HDR-ядро импульса
 
         float alpha = (0.028 + rim * 0.22 + wave * 0.72 + secondary * 0.4) * uOpacity;
@@ -438,7 +464,10 @@ export function createDNA({ sequence, quality = "high" }) {
 
   const glowGeometryA = new THREE.TubeGeometry(curveA, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false);
   const glowGeometryB = new THREE.TubeGeometry(curveB, tubularSegments, tubeRadius * 2.6, high ? 10 : 7, false);
-  const glowGeometry = mergeGeometries([glowGeometryA, glowGeometryB]);
+  const glowGeometry = mergeGeometries(
+    [glowGeometryA, glowGeometryB],
+    { strandAttribute: "aStrand" },
+  );
   glowGeometryA.dispose();
   glowGeometryB.dispose();
 

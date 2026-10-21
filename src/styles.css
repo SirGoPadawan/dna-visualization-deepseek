@@ -242,6 +242,13 @@ body.is-ready #scene {
   transform: translateY(0) scale(0.97);
 }
 
+.icon-btn--spider:hover {
+  border-color: rgba(255, 120, 150, 0.42);
+  color: #ffd7de;
+  background: rgba(60, 20, 34, 0.72);
+  box-shadow: 0 0 18px rgba(255, 70, 100, 0.18);
+}
+
 .icon-btn:focus-visible,
 .chip:focus-visible,
 .speed input:focus-visible {

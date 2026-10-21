@@ -1,0 +1,334 @@
+/* ==========================================================================
+   SPIDER-DNA — красно-синяя паутинная тема
+   Подключается после styles.css и переопределяет только оформление.
+   ========================================================================== */
+
+html[data-theme="spider"] {
+  --bg: #06040c;
+  --ink: #f3f2ff;
+  --muted: #baaac4;
+  --faint: #83718f;
+  --line: rgba(255, 128, 150, 0.16);
+  --line-strong: rgba(255, 160, 180, 0.3);
+
+  --glass: linear-gradient(165deg, rgba(42, 14, 30, 0.76), rgba(10, 7, 22, 0.84));
+  --glass-flat: rgba(22, 9, 22, 0.7);
+
+  --a: #ff2f4f;
+  --t: #ff7d8f;
+  --g: #2f6bff;
+  --c: #64d2ff;
+
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+html[data-theme="spider"] ::selection {
+  background: rgba(255, 47, 79, 0.3);
+}
+
+/* --- паутина на фоне ---------------------------------------------------- */
+
+.web {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.85;
+  mix-blend-mode: screen;
+  background:
+    repeating-conic-gradient(
+      from 0deg at 50% 46%,
+      rgba(255, 158, 176, 0.12) 0deg 0.4deg,
+      transparent 0.4deg 15deg
+    ),
+    repeating-radial-gradient(
+      circle at 50% 46%,
+      transparent 0 84px,
+      rgba(152, 194, 255, 0.09) 84px 85px,
+      transparent 85px 168px
+    );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 46%,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 34%,
+    transparent 66%
+  );
+  mask-image: radial-gradient(
+    circle at 50% 46%,
+    #000 0%,
+    rgba(0, 0, 0, 0.85) 34%,
+    transparent 66%
+  );
+}
+
+.web-spider {
+  position: fixed;
+  top: 15vh;
+  right: 15vw;
+  z-index: 2;
+  width: 72px;
+  height: 72px;
+  color: #ffd7e0;
+  opacity: 0.22;
+  filter: drop-shadow(0 0 14px rgba(255, 47, 79, 0.55));
+  pointer-events: none;
+}
+
+/* --- атмосфера ---------------------------------------------------------- */
+
+html[data-theme="spider"] .vignette {
+  background:
+    radial-gradient(52% 46% at 16% 10%, rgba(255, 47, 79, 0.15), transparent 70%),
+    radial-gradient(56% 50% at 86% 90%, rgba(47, 107, 255, 0.17), transparent 72%),
+    radial-gradient(78% 62% at 50% 44%, transparent 38%, rgba(3, 2, 9, 0.68) 100%),
+    linear-gradient(
+      180deg,
+      rgba(8, 4, 14, 0.5) 0%,
+      transparent 22%,
+      transparent 70%,
+      rgba(4, 3, 11, 0.68) 100%
+    );
+}
+
+/* --- бренд -------------------------------------------------------------- */
+
+html[data-theme="spider"] .brand__mark {
+  filter:
+    drop-shadow(0 0 14px rgba(255, 47, 79, 0.36))
+    drop-shadow(0 0 22px rgba(47, 107, 255, 0.26));
+}
+
+html[data-theme="spider"] .brand__title {
+  background: linear-gradient(100deg, #ffffff 12%, #ffb3c0 48%, #8eb6ff 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html[data-theme="spider"] .brand__sub {
+  color: #cbb7d2;
+}
+
+html[data-theme="spider"] .brand:focus-visible {
+  outline-color: #ff6f86;
+}
+
+html[data-theme="spider"] .icon-btn--back {
+  border-color: rgba(255, 130, 150, 0.28);
+  color: #ffdce3;
+  background: linear-gradient(150deg, rgba(255, 47, 79, 0.14), rgba(47, 107, 255, 0.12));
+}
+
+html[data-theme="spider"] .icon-btn--back:hover {
+  border-color: rgba(255, 160, 180, 0.5);
+  background: linear-gradient(150deg, rgba(255, 47, 79, 0.22), rgba(47, 107, 255, 0.2));
+  box-shadow: 0 0 18px rgba(255, 70, 100, 0.18);
+}
+
+html[data-theme="spider"] .icon-btn:focus-visible,
+html[data-theme="spider"] .chip:focus-visible,
+html[data-theme="spider"] .speed input:focus-visible {
+  outline-color: rgba(255, 100, 125, 0.9);
+}
+
+/* --- карточка данных ---------------------------------------------------- */
+
+html[data-theme="spider"] .data-panel {
+  overflow: hidden;
+}
+
+html[data-theme="spider"] .data-panel::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 60, 90, 0.6),
+    rgba(60, 120, 255, 0.6),
+    transparent
+  );
+}
+
+html[data-theme="spider"] .specimen {
+  color: #a98fa8;
+}
+
+html[data-theme="spider"] .seq__live::before {
+  background: #ff5068;
+  box-shadow: 0 0 8px rgba(255, 60, 90, 0.85);
+}
+
+/* --- док ---------------------------------------------------------------- */
+
+html[data-theme="spider"] .dock {
+  border-color: rgba(255, 130, 150, 0.18);
+  background: linear-gradient(180deg, rgba(38, 14, 30, 0.84), rgba(9, 8, 22, 0.9));
+}
+
+html[data-theme="spider"] .segmented {
+  background: rgba(10, 4, 14, 0.55);
+}
+
+html[data-theme="spider"] .chip.is-active {
+  background: linear-gradient(180deg, rgba(255, 60, 90, 0.2), rgba(47, 107, 255, 0.18));
+  border-color: rgba(255, 140, 160, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 22px rgba(255, 60, 90, 0.14);
+}
+
+html[data-theme="spider"] .chip:hover {
+  background: rgba(255, 140, 160, 0.08);
+}
+
+html[data-theme="spider"] .speed input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, rgba(255, 47, 79, 0.8), rgba(47, 107, 255, 0.75));
+}
+
+html[data-theme="spider"] .speed input[type="range"]::-moz-range-track {
+  background: rgba(255, 130, 150, 0.28);
+}
+
+html[data-theme="spider"] .speed input[type="range"]::-moz-range-progress {
+  background: linear-gradient(90deg, #ff2f4f, #2f6bff);
+}
+
+html[data-theme="spider"] .speed input[type="range"]::-webkit-slider-thumb {
+  border-color: rgba(255, 228, 234, 0.95);
+  background: #ffffff;
+  box-shadow:
+    0 0 12px rgba(255, 60, 90, 0.55),
+    0 0 20px rgba(47, 107, 255, 0.35);
+}
+
+html[data-theme="spider"] .speed input[type="range"]::-moz-range-thumb {
+  border-color: rgba(255, 228, 234, 0.95);
+  background: #ffffff;
+  box-shadow:
+    0 0 12px rgba(255, 60, 90, 0.55),
+    0 0 20px rgba(47, 107, 255, 0.35);
+}
+
+/* --- подсказка ---------------------------------------------------------- */
+
+html[data-theme="spider"] .tooltip {
+  border-color: rgba(255, 140, 160, 0.24);
+  background: rgba(19, 7, 18, 0.92);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.58),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(255, 47, 79, 0.1);
+}
+
+html[data-theme="spider"] .tooltip::after {
+  border-right-color: rgba(255, 140, 160, 0.24);
+  border-bottom-color: rgba(255, 140, 160, 0.24);
+  background: rgba(19, 7, 18, 0.92);
+}
+
+html[data-theme="spider"] .tooltip__pair {
+  color: #ffe0e6;
+}
+
+/* --- панель ------------------------------------------------------------- */
+
+html[data-theme="spider"] .drawer-backdrop {
+  background: rgba(4, 2, 8, 0.56);
+}
+
+html[data-theme="spider"] .drawer {
+  border-left-color: rgba(255, 120, 145, 0.2);
+  background:
+    radial-gradient(120% 55% at 100% 0%, rgba(255, 47, 79, 0.17), transparent 62%),
+    radial-gradient(110% 60% at 0% 100%, rgba(47, 107, 255, 0.16), transparent 64%),
+    linear-gradient(180deg, rgba(24, 8, 20, 0.97), rgba(4, 4, 12, 0.985));
+  box-shadow:
+    -30px 0 80px rgba(0, 0, 0, 0.6),
+    -1px 0 40px rgba(255, 47, 79, 0.06);
+  scrollbar-color: rgba(255, 130, 150, 0.32) transparent;
+}
+
+html[data-theme="spider"] .drawer__title {
+  background: linear-gradient(115deg, #ffffff 8%, #ffbcc8 48%, #9dbdff 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+html[data-theme="spider"] .nowrap {
+  white-space: nowrap;
+}
+
+html[data-theme="spider"] .fact strong {
+  color: #ffe6eb;
+}
+
+html[data-theme="spider"] .drawer__list b {
+  color: #ffdde4;
+}
+
+html[data-theme="spider"] .drawer__note {
+  border-color: rgba(255, 140, 160, 0.22);
+  background: rgba(255, 80, 110, 0.03);
+}
+
+html[data-theme="spider"] .drawer::-webkit-scrollbar-thumb {
+  background: rgba(255, 130, 150, 0.3);
+  background-clip: content-box;
+}
+
+/* --- загрузка ----------------------------------------------------------- */
+
+html[data-theme="spider"] .loader {
+  background:
+    radial-gradient(70% 60% at 50% 42%, #180b1d 0%, #050410 70%),
+    #06040c;
+}
+
+html[data-theme="spider"] .loader__helix {
+  filter:
+    drop-shadow(0 0 20px rgba(255, 47, 79, 0.42))
+    drop-shadow(0 0 30px rgba(47, 107, 255, 0.32));
+}
+
+html[data-theme="spider"] .loader__track {
+  background: rgba(255, 140, 160, 0.16);
+}
+
+html[data-theme="spider"] .loader__track span {
+  background: linear-gradient(90deg, #ff2f4f, #b0418f, #2f6bff);
+  box-shadow: 0 0 12px rgba(255, 47, 79, 0.65);
+}
+
+/* --- адаптивность ------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .web-spider {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  html[data-theme="spider"] .brand__sub {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .web {
+    opacity: 0.65;
+  }
+
+  html[data-theme="spider"] .web-spider {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .web-spider {
+    filter: none;
+  }
+}
