@@ -43,7 +43,7 @@ const SPIDER = {
   bondLabel: "паутинные нити",
 
   // Красные пары (A–T) и синие пары (G–C) — как костюм.
-  baseColors: { A: "#ff2f4f", T: "#ff7d8f", G: "#2f6bff", C: "#64d2ff" },
+  baseColors: { A: "#ff2947", T: "#ff9fac", G: "#2f6bff", C: "#64d2ff" },
 
   glow: {
     bottom: "#ff3b4e",

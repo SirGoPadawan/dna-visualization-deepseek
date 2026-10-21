@@ -347,8 +347,8 @@ body.is-ready #scene {
   height: 8px;
   flex: none;
   border-radius: 50%;
-  background: var(--c, #fff);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent);
+  background: var(--swatch, #fff);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--swatch, #fff) 60%, transparent);
 }
 
 /* --- posledovatelnost na pravoy storone --------------------------------- */

@@ -14,8 +14,8 @@ html[data-theme="spider"] {
   --glass: linear-gradient(165deg, rgba(42, 14, 30, 0.76), rgba(10, 7, 22, 0.84));
   --glass-flat: rgba(22, 9, 22, 0.7);
 
-  --a: #ff2f4f;
-  --t: #ff7d8f;
+  --a: #ff2947;
+  --t: #ff9fac;
   --g: #2f6bff;
   --c: #64d2ff;
 
@@ -63,14 +63,14 @@ html[data-theme="spider"] ::selection {
 
 .web-spider {
   position: fixed;
-  top: 15vh;
-  right: 15vw;
+  top: 14vh;
+  right: 14vw;
   z-index: 2;
-  width: 72px;
-  height: 72px;
-  color: #ffd7e0;
-  opacity: 0.22;
-  filter: drop-shadow(0 0 14px rgba(255, 47, 79, 0.55));
+  width: 80px;
+  height: 80px;
+  color: #ff8fa0;
+  opacity: 0.34;
+  filter: drop-shadow(0 0 16px rgba(255, 47, 79, 0.6));
   pointer-events: none;
 }
 
