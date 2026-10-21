@@ -36,10 +36,29 @@ const state = {
   drawerOpen: false,
   sequence: "",
   seqFocus: null,
+  pixelRatio: 1,
+  dprIndex: 0,
+  dprSteps: [],
+  lastDraw: 0,
 };
 
 const QUALITY = state.isMobile || (navigator.hardwareConcurrency || 8) <= 4 ? "low" : "high";
 const BP_COUNT = state.isMobile ? 60 : 84;
+
+// Потолок разрешения: на телефонах выше 1.75 не имеет смысла — растёт только
+// нагрузка на GPU, а разница на экране почти не видна.
+const DPR_MAX = Math.min(window.devicePixelRatio || 1, state.isMobile ? 1.75 : 2);
+state.pixelRatio = DPR_MAX;
+state.dprSteps = state.isMobile ? buildDprSteps(DPR_MAX) : [DPR_MAX];
+
+const perf = {
+  last: 0,
+  samples: [],
+  windowStart: performance.now(),
+  cooldownUntil: 0,
+  lastRaise: -Infinity,
+  maxIndex: 0,
+};
 
 const SEQ_ROWS = 7;
 const SEQ_COLS = 12;
@@ -129,7 +148,7 @@ function init() {
     powerPreference: "high-performance",
     stencil: false,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(state.pixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
@@ -151,7 +170,7 @@ function init() {
   scene.add(dna.group);
 
   dust = createParticles({
-    count: QUALITY === "high" ? 950 : 420,
+    count: QUALITY === "high" ? 950 : state.isMobile ? 320 : 420,
     tintA: THEME.dust.a,
     tintB: THEME.dust.b,
   });
@@ -195,6 +214,37 @@ function init() {
   window.addEventListener("resize", onResize);
   setupInteractions();
 
+  if (new URLSearchParams(location.search).has("perf")) {
+    window.__dnaPerf = {
+      state: () => ({
+        dpr: state.pixelRatio,
+        index: state.dprIndex,
+        steps: state.dprSteps.slice(),
+        maxIndex: perf.maxIndex,
+        canvas: [renderer.domElement.width, renderer.domElement.height],
+        bloom: bloomPass
+          ? [
+              bloomPass.renderTargetsHorizontal[0].width,
+              bloomPass.renderTargetsHorizontal[0].height,
+            ]
+          : null,
+        devicePixelRatio: window.devicePixelRatio,
+      }),
+      sample: (average) => {
+        perf.cooldownUntil = 0;
+        maybeAdjustQuality(average, performance.now());
+        return state.pixelRatio;
+      },
+      reset: () => {
+        perf.maxIndex = 0;
+        perf.lastRaise = -Infinity;
+        perf.cooldownUntil = 0;
+        applyDprIndex(0);
+        return state.pixelRatio;
+      },
+    };
+  }
+
   animate();
 }
 
@@ -206,18 +256,36 @@ function createComposer() {
 
   const instance = new EffectComposer(renderer, target);
   instance.setPixelRatio(renderer.getPixelRatio());
-  instance.setSize(window.innerWidth, window.innerHeight);
 
   instance.addPass(new RenderPass(scene, camera));
 
+  // На мобильных bloom считаем в половинном разрешении: это вдвое меньше
+  // пикселей на самый дорогой проход, а размытие всё равно скрывает разницу.
+  const bloomScale = state.isMobile ? 0.5 : 1;
   bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(
+      Math.max(1, Math.round(window.innerWidth * bloomScale)),
+      Math.max(1, Math.round(window.innerHeight * bloomScale)),
+    ),
     state.isMobile ? THEME.bloom.mobile : THEME.bloom.strength,
     THEME.bloom.radius,
     THEME.bloom.threshold,
   );
+
+  if (bloomScale < 1) {
+    const nativeSetSize = bloomPass.setSize.bind(bloomPass);
+    bloomPass.setSize = (width, height) => nativeSetSize(
+      Math.max(1, Math.round(width * bloomScale)),
+      Math.max(1, Math.round(height * bloomScale)),
+    );
+  }
+
   instance.addPass(bloomPass);
   instance.addPass(new OutputPass());
+
+  // Размер задаём после добавления проходов, чтобы bloom сразу получил
+  // половинное разрешение через переопределённый setSize.
+  instance.setSize(window.innerWidth, window.innerHeight);
 
   return instance;
 }
@@ -600,6 +668,13 @@ function animate() {
   if (!state.ready || document.hidden) return;
 
   const now = performance.now();
+
+  // При открытой панели сцена за blur почти статична — 30 fps достаточно.
+  if (state.drawerOpen && now - state.lastDraw < 32) return;
+  state.lastDraw = now;
+
+  trackPerformance(now);
+
   const tweening = updateTween(now);
 
   if (!tweening) controls.update();
@@ -630,12 +705,92 @@ function onResize() {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
 
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, state.isMobile ? 1.75 : 2);
-  renderer.setPixelRatio(pixelRatio);
-  renderer.setSize(width, height, false);
-  composer.setPixelRatio(pixelRatio);
-  composer.setSize(width, height);
-
-  dust.material.uniforms.uPixelRatio.value = pixelRatio;
+  applyPixelRatio(state.pixelRatio);
   closeTooltip();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Адаптивное разрешение                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Ступени качества: максимум и три более дешёвых варианта. */
+function buildDprSteps(max) {
+  const values = [max, max * 0.86, max * 0.72, max * 0.6].map(
+    (value) => Math.max(0.75, Math.round(value * 100) / 100),
+  );
+  return [...new Set(values)];
+}
+
+function applyPixelRatio(ratio) {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(width, height, false);
+
+  if (composer) {
+    composer.setPixelRatio(ratio);
+    composer.setSize(width, height);
+  }
+
+  if (dust) dust.material.uniforms.uPixelRatio.value = ratio;
+}
+
+function applyDprIndex(index) {
+  const safe = THREE.MathUtils.clamp(index, 0, state.dprSteps.length - 1);
+  state.dprIndex = safe;
+  state.pixelRatio = state.dprSteps[safe];
+  applyPixelRatio(state.pixelRatio);
+}
+
+/**
+ * Копим длительности кадров и раз в 1.5 с решаем, менять ли разрешение.
+ * Кадры длиннее 250 мс игнорируем: это переключение вкладки, отладчик или
+ * принудительный рендер в headless, а не реальная нагрузка.
+ */
+function trackPerformance(now) {
+  if (perf.last) {
+    const delta = now - perf.last;
+    if (delta > 0 && delta < 250) perf.samples.push(delta);
+  }
+  perf.last = now;
+
+  if (now - perf.windowStart < 1500) return;
+
+  if (perf.samples.length >= 20) {
+    let total = 0;
+    for (const sample of perf.samples) total += sample;
+    const average = total / perf.samples.length;
+    if (!state.drawerOpen) maybeAdjustQuality(average, now);
+  }
+
+  perf.samples.length = 0;
+  perf.windowStart = now;
+}
+
+/**
+ * Гистерезис: понижаемся при < ~42 fps, поднимаемся при > ~57 fps.
+ * Если после подъёма сразу стало тяжело — запоминаем ступень и больше
+ * не поднимаемся выше неё, чтобы не было качелей.
+ */
+function maybeAdjustQuality(average, now) {
+  const steps = state.dprSteps;
+  if (steps.length < 2 || now < perf.cooldownUntil) return;
+
+  const index = state.dprIndex;
+
+  if (average > 24 && index < steps.length - 1) {
+    if (now - perf.lastRaise < 10000) {
+      perf.maxIndex = Math.max(perf.maxIndex, index + 1);
+    }
+    applyDprIndex(index + 1);
+    perf.cooldownUntil = now + 2600;
+    return;
+  }
+
+  if (average < 17.8 && index > perf.maxIndex) {
+    applyDprIndex(index - 1);
+    perf.lastRaise = now;
+    perf.cooldownUntil = now + 6000;
+  }
 }

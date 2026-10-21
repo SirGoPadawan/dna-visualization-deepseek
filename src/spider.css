@@ -311,6 +311,18 @@ html[data-theme="spider"] .loader__track span {
   }
 }
 
+@media (max-width: 820px) {
+  html[data-theme="spider"] .icon-btn {
+    background: rgba(24, 10, 24, 0.88);
+  }
+
+  html[data-theme="spider"] .icon-btn--back {
+    background:
+      linear-gradient(150deg, rgba(255, 47, 79, 0.18), rgba(47, 107, 255, 0.16)),
+      rgba(24, 10, 24, 0.88);
+  }
+}
+
 @media (max-width: 700px) {
   html[data-theme="spider"] .brand__sub {
     display: none;

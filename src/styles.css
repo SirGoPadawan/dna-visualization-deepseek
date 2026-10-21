@@ -1119,6 +1119,33 @@ kbd {
     bottom: 82px;
     font-size: 0.64rem;
   }
+
+  /* Дорогие blur-слои на телефонах почти не видны, но заметно бьют по fps. */
+  .icon-btn {
+    background: rgba(9, 16, 30, 0.86);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .dock {
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  .drawer {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .drawer-backdrop {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .tooltip {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
 }
 
 @media (max-width: 620px) {
